@@ -20,6 +20,15 @@ app.post('/streams/webhook', async (req, res) => {
     
     const payload = req.body;
     
+    // 调试：打印接收到的数据类型和键
+    console.log('   Payload 类型:', typeof payload);
+    console.log('   是否为数组:', Array.isArray(payload));
+    if (payload && typeof payload === 'object') {
+      console.log('   Payload 的键:', Object.keys(payload));
+      console.log('   有 events 属性:', 'events' in payload);
+      console.log('   events 是数组:', Array.isArray(payload.events));
+    }
+    
     // 验证数据格式
     if (!payload) {
       console.error('❌ 无效的 payload 格式');
@@ -34,7 +43,7 @@ app.post('/streams/webhook', async (req, res) => {
     
     if (Array.isArray(payload)) {
       // 格式1：原始的数组格式
-      console.log('   格式：数组格式');
+      console.log('   ✅ 匹配格式1：数组格式');
       for (const batch of payload) {
         if (batch && batch.logs && Array.isArray(batch.logs)) {
           totalEvents += batch.logs.length;
@@ -43,7 +52,7 @@ app.post('/streams/webhook', async (req, res) => {
       }
     } else if (payload.events && Array.isArray(payload.events)) {
       // 格式2：从 JavaScript 过滤器返回的对象格式
-      console.log('   格式：对象格式（JavaScript 过滤器）');
+      console.log('   ✅ 匹配格式2：对象格式（JavaScript 过滤器）');
       totalEvents = payload.events.length;
       
       // 打印统计信息
@@ -55,6 +64,7 @@ app.post('/streams/webhook', async (req, res) => {
       await handleFilteredEvents(payload.events);
     } else {
       console.error('❌ 未识别的数据格式');
+      console.error('   Payload 示例:', JSON.stringify(payload).slice(0, 200));
       return res.status(400).json({ error: '未识别的数据格式' });
     }
 

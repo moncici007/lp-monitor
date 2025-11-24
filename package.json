@@ -9,6 +9,7 @@
     "lint": "next lint",
     "monitor": "node src/monitor/index.js",
     "monitor:streams": "node src/monitor/indexWithStreams.js",
+    "webhook:raw": "node webhook-server-raw.js",
     "db:init": "psql -U postgres -f src/db/schema.sql"
   },
   "dependencies": {

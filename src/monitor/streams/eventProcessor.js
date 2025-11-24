@@ -7,6 +7,9 @@ const alertRepository = require('../../db/repositories/alertRepository');
 
 // 事件签名 - 支持 V2 和 V3
 const EVENT_SIGNATURES = {
+  // Factory 事件
+  PAIR_CREATED: '0x0d3648bd0f6ba80134a33ba9275ac585d9d315f0ad8355cddefde31afa28d0e9',
+  
   // PancakeSwap V2
   SWAP_V2: '0xd78ad95fa46c994b6551d0da85fc275fe613ce37657fb8d5e3d130840159d822',
   MINT_V2: '0x4c209b5fc8ad50758f13e2e1088ba56a560dff690a1c6fef26394f4c03821c4f',
@@ -57,6 +60,9 @@ async function processLog(log) {
 
     // 根据事件签名分发处理
     switch (eventSignature) {
+      case EVENT_SIGNATURES.PAIR_CREATED:
+        await handlePairCreatedEvent(log);
+        break;
       case EVENT_SIGNATURES.SWAP:
       case EVENT_SIGNATURES.SWAP_V2:
       case EVENT_SIGNATURES.SWAP_V3:
@@ -82,6 +88,109 @@ async function processLog(log) {
   } catch (error) {
     if (!error.message.includes('duplicate key')) {
       console.error('❌ 处理日志失败:', error.message);
+    }
+  }
+}
+
+// 处理 PairCreated 事件
+async function handlePairCreatedEvent(log) {
+  try {
+    const { address: factoryAddress, data, topics, blockNumber, transactionHash, blockTimestamp } = log;
+    
+    // PairCreated(address indexed token0, address indexed token1, address pair, uint)
+    // topics[0] = 事件签名
+    // topics[1] = token0 (indexed)
+    // topics[2] = token1 (indexed)
+    // data = pair address + pair index
+    
+    if (!topics || topics.length < 3) {
+      console.error('❌ PairCreated 事件数据不完整');
+      return;
+    }
+
+    const abiCoder = ethers.AbiCoder.defaultAbiCoder();
+    
+    // 从 topics 中提取 token0 和 token1
+    const token0 = ethers.getAddress('0x' + topics[1].slice(26)); // 移除前导零
+    const token1 = ethers.getAddress('0x' + topics[2].slice(26));
+    
+    // 从 data 中提取 pair 地址和 index
+    const [pairAddress, pairIndex] = abiCoder.decode(['address', 'uint256'], data);
+
+    console.log('\n🆕 检测到新交易对创建:');
+    console.log(`   Factory: ${factoryAddress}`);
+    console.log(`   Pair: ${pairAddress}`);
+    console.log(`   Token0: ${token0}`);
+    console.log(`   Token1: ${token1}`);
+    console.log(`   Index: ${pairIndex.toString()}`);
+    console.log(`   Tx: ${transactionHash}`);
+
+    // 检查是否已存在
+    const exists = await pairRepository.pairExists(pairAddress.toLowerCase());
+    if (exists) {
+      console.log('   ⚠️  交易对已存在，跳过');
+      return;
+    }
+
+    // 解析区块号和时间戳
+    let blockNum = blockNumber;
+    if (typeof blockNumber === 'string') {
+      blockNum = blockNumber.startsWith('0x') 
+        ? parseInt(blockNumber, 16) 
+        : parseInt(blockNumber, 10);
+    }
+
+    let timestamp = blockTimestamp;
+    if (blockTimestamp) {
+      if (typeof blockTimestamp === 'string') {
+        timestamp = new Date(parseInt(blockTimestamp, 10) * 1000);
+      } else if (typeof blockTimestamp === 'number') {
+        timestamp = new Date(blockTimestamp * 1000);
+      }
+    }
+    
+    if (!timestamp || isNaN(timestamp.getTime())) {
+      timestamp = await getBlockTimestamp(blockNum);
+    }
+
+    // 获取代币信息
+    console.log('   📝 获取代币信息...');
+    const { getTokenInfo } = require('../../blockchain/tokenService');
+    const [token0Info, token1Info] = await Promise.all([
+      getTokenInfo(token0).catch(e => ({ symbol: 'UNKNOWN', name: 'Unknown', decimals: 18 })),
+      getTokenInfo(token1).catch(e => ({ symbol: 'UNKNOWN', name: 'Unknown', decimals: 18 })),
+    ]);
+
+    // 保存交易对信息
+    const pairData = {
+      address: pairAddress.toLowerCase(),
+      token0Address: token0.toLowerCase(),
+      token1Address: token1.toLowerCase(),
+      blockNumber: blockNum,
+      transactionHash,
+    };
+
+    const savedPair = await pairRepository.createPair(pairData);
+
+    if (savedPair) {
+      console.log(`✅ 新交易对已保存: ${token0Info.symbol}/${token1Info.symbol}`);
+      console.log(`   数据库ID: ${savedPair.id}`);
+
+      // 更新 Stream 配置（添加新交易对到监听列表）
+      try {
+        const streamManager = require('./streamManager');
+        const pairs = await pairRepository.getRecentPairs(200);
+        const addresses = pairs.map((p) => p.address.toLowerCase());
+        await streamManager.updateStreamAddresses(addresses, true); // includeFactory = true
+        console.log(`   ✅ Stream 已更新，现监听 ${addresses.length} 个交易对`);
+      } catch (error) {
+        console.error('   ❌ 更新 Stream 失败:', error.message);
+      }
+    }
+  } catch (error) {
+    if (!error.message.includes('duplicate key')) {
+      console.error('❌ 处理 PairCreated 事件失败:', error.message);
+      console.error('   事件数据:', { address: log.address, blockNumber: log.blockNumber, txHash: log.transactionHash });
     }
   }
 }

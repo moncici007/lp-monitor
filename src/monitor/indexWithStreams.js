@@ -46,9 +46,16 @@ async function startMonitoring() {
     console.log('\n🏭 启动 Factory 监听器...');
     await initFactoryListener();
 
-    // 初始化 Stream 配置
-    console.log('\n🔧 初始化 QuickNode Stream...');
-    await initializeStream();
+    // 初始化 Stream 配置（如果配置了）
+    if (process.env.QUICKNODE_STREAM_ID && process.env.QUICKNODE_API_KEY) {
+      console.log('\n🔧 初始化 QuickNode Stream...');
+      await initializeStream();
+    } else {
+      console.log('\n⚠️  未配置 QuickNode Streams');
+      console.log('   系统将只监听 Factory 事件（新交易对创建）');
+      console.log('   交易对事件（Swap/Mint/Burn/Sync）需要配置 Streams');
+      console.log('   请参考 STREAMS_SETUP.md 或 ENV_SETUP_GUIDE.md');
+    }
 
     // 设置定时任务 - 每小时分析一次所有交易对
     cron.schedule('0 * * * *', async () => {

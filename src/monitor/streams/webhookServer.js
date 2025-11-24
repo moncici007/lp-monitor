@@ -6,7 +6,12 @@
  */
 
 const http = require('http');
-const { handleFilteredEvents } = require('./src/monitor/streams/eventProcessor');
+require('dotenv').config();
+const { handleFilteredEvents } = require('./eventProcessor');
+const { updateStreamAddresses, getStreamInfo, startStream } = require('./streamManager');
+const pairRepository = require('../../db/repositories/pairRepository');
+const db = require('../../db/client');
+const cron = require('node-cron');
 
 const PORT = process.env.WEBHOOK_PORT || 3000;
 

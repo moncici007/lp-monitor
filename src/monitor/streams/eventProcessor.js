@@ -262,8 +262,47 @@ async function checkLiquidityDrain(pairAddress, amount0, amount1) {
   }
 }
 
+// 处理 JavaScript 过滤器返回的预处理事件
+async function handleFilteredEvents(events) {
+  try {
+    console.log(`   处理 ${events.length} 个预过滤事件...`);
+
+    for (const event of events) {
+      await processFilteredEvent(event);
+    }
+  } catch (error) {
+    console.error('❌ 处理预过滤事件失败:', error.message);
+  }
+}
+
+// 处理单个预过滤事件
+async function processFilteredEvent(event) {
+  try {
+    const { eventType, address, topics, data } = event;
+    
+    // 转换为标准 log 格式
+    const log = {
+      address: address,
+      topics: topics,
+      data: data,
+      blockNumber: event.blockNumber,
+      transactionHash: event.transactionHash,
+      blockTimestamp: event.blockTimestamp,
+      logIndex: event.logIndex,
+    };
+    
+    // 复用现有的处理逻辑
+    await processLog(log);
+  } catch (error) {
+    if (!error.message.includes('duplicate key')) {
+      console.error('❌ 处理预过滤事件失败:', error.message);
+    }
+  }
+}
+
 module.exports = {
   handleStreamData,
+  handleFilteredEvents,
   processLog,
 };
 

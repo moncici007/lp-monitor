@@ -1,6 +1,6 @@
 const express = require('express');
 const bodyParser = require('body-parser');
-const { handleStreamData } = require('./eventProcessor');
+const { handleStreamData, handleFilteredEvents } = require('./eventProcessor');
 
 const app = express();
 
@@ -21,26 +21,49 @@ app.post('/streams/webhook', async (req, res) => {
     const payload = req.body;
     
     // 验证数据格式
-    if (!payload || !Array.isArray(payload)) {
+    if (!payload) {
       console.error('❌ 无效的 payload 格式');
       return res.status(400).json({ error: '无效的数据格式' });
     }
 
-    // 处理数据
-    let totalLogs = 0;
-    for (const batch of payload) {
-      if (batch && batch.logs && Array.isArray(batch.logs)) {
-        totalLogs += batch.logs.length;
-        await handleStreamData(batch);
+    let totalEvents = 0;
+    
+    // 支持两种格式：
+    // 格式1：数组格式 [{logs: [...]}, ...]
+    // 格式2：对象格式 {events: [...], stats: {...}}
+    
+    if (Array.isArray(payload)) {
+      // 格式1：原始的数组格式
+      console.log('   格式：数组格式');
+      for (const batch of payload) {
+        if (batch && batch.logs && Array.isArray(batch.logs)) {
+          totalEvents += batch.logs.length;
+          await handleStreamData(batch);
+        }
       }
+    } else if (payload.events && Array.isArray(payload.events)) {
+      // 格式2：从 JavaScript 过滤器返回的对象格式
+      console.log('   格式：对象格式（JavaScript 过滤器）');
+      totalEvents = payload.events.length;
+      
+      // 打印统计信息
+      if (payload.stats) {
+        console.log('   统计:', JSON.stringify(payload.stats, null, 2));
+      }
+      
+      // 处理事件
+      await handleFilteredEvents(payload.events);
+    } else {
+      console.error('❌ 未识别的数据格式');
+      return res.status(400).json({ error: '未识别的数据格式' });
     }
 
-    console.log(`✅ 处理完成，共 ${totalLogs} 条日志`);
+    console.log(`✅ 处理完成，共 ${totalEvents} 个事件`);
     
     // 返回成功响应
     res.status(200).json({ 
       status: 'success',
-      processed: totalLogs,
+      processed: totalEvents,
       timestamp: new Date().toISOString()
     });
   } catch (error) {

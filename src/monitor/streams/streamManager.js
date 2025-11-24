@@ -1,7 +1,7 @@
 const axios = require('axios');
 require('dotenv').config();
 
-const QUICKNODE_API_BASE = 'https://api.quicknode.com/streams/v1';
+const QUICKNODE_API_BASE = 'https://api.quicknode.com/streams/rest/v1/streams';
 const STREAM_ID = process.env.QUICKNODE_STREAM_ID;
 const API_KEY = process.env.QUICKNODE_API_KEY;
 

@@ -3,19 +3,31 @@ const { handleStreamData, handleFilteredEvents } = require('./eventProcessor');
 
 const app = express();
 
-// 禁用 Express 的自动解析，手动处理
-app.use(express.json({ 
-  limit: '50mb',
-  verify: (req, res, buf, encoding) => {
-    // 保存原始 buffer 用于调试
-    req.rawBody = buf.toString(encoding || 'utf8');
-  }
+// 重要：处理大数据包和分包问题
+// 1. 增加 payload 大小限制
+// 2. 使用 raw parser 处理所有数据
+// 3. 手动解析 JSON
+app.use(express.raw({ 
+  type: 'application/json',
+  limit: '100mb'  // 增加到 100MB
 }));
 
-app.use(express.urlencoded({ 
-  extended: true, 
-  limit: '50mb' 
-}));
+// 手动解析 JSON（处理分包问题）
+app.use((req, res, next) => {
+  if (req.body && Buffer.isBuffer(req.body)) {
+    try {
+      const bodyStr = req.body.toString('utf-8');
+      req.rawBody = bodyStr; // 保存原始字符串
+      req.body = JSON.parse(bodyStr);
+      console.log('✅ JSON 解析成功，body 大小:', bodyStr.length, '字节');
+    } catch (error) {
+      console.error('❌ JSON 解析失败:', error.message);
+      req.rawBody = req.body.toString('utf-8');
+      // 不返回错误，让后续处理器处理
+    }
+  }
+  next();
+});
 
 // 健康检查端点
 app.get('/health', (req, res) => {

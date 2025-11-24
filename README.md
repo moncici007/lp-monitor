@@ -1,248 +1,347 @@
-# BSC 流动性池监控系统
+# 🔍 BSC LP Monitor
 
-实时监控BSC链上PancakeSwap V2新创建的交易对，追踪交易量、大额交易、流动性变化等套利信息。
+BSC 链上流动性池监控系统 - 实时追踪 PancakeSwap V2/V3 交易对
 
-## 功能特性
+---
 
-- 🔍 **实时监控** - 自动监听PancakeSwap V2 Factory合约的新交易对创建事件
-- 💱 **交易追踪** - 记录每个池子的Swap交易，标记大额交易
-- 💧 **流动性监控** - 追踪添加/移除流动性事件，检测Rug Pull风险
-- 📊 **数据分析** - 小时级别的交易量统计和流动性分析
-- 🚨 **智能警报** - 自动生成套利机会和风险警报
-- 📱 **Web界面** - 美观的仪表板展示实时数据
+## ✨ 功能特性
 
-## 技术栈
+- 🔄 **实时监控**: 自动监控新创建的交易对
+- 📊 **交易分析**: 追踪交易量、大额交易
+- 💧 **流动性监控**: 检测流动性添加/移除
+- 🚨 **异常告警**: 识别潜在的 rug pull 和异常活动
+- 🎯 **套利信号**: 发现有价值的套利机会
+- 🌐 **Web 界面**: 可视化展示所有监控数据
+
+---
+
+## 🏗️ 技术栈
 
 - **前端**: Next.js 14, React, TailwindCSS
-- **后端**: Node.js, Next.js API Routes
-- **区块链**: ethers.js v6, QuickNode RPC
-- **数据库**: PostgreSQL (原生SQL)
-- **任务调度**: node-cron
+- **后端**: Node.js, Express
+- **数据库**: PostgreSQL
+- **区块链**: ethers.js, QuickNode RPC + Streams
+- **监控**: PancakeSwap V2 & V3
 
-## 系统要求
+---
+
+## 🚀 快速开始
+
+### 前置要求
 
 - Node.js 18+
 - PostgreSQL 14+
-- BSC RPC节点访问权限（已配置QuickNode）
+- QuickNode 账户（已配置）
 
-## 快速开始
-
-### 1. 安装依赖
+### 安装
 
 ```bash
+# 1. 安装依赖
 npm install
+
+# 2. 配置环境变量
+# .env 文件已包含必要配置
+
+# 3. 初始化数据库
+psql postgresql://postgres:lp-monitor@127.0.0.1:5432/lp_monitor -f src/db/schema.sql
 ```
 
-### 2. 配置环境变量
+### 运行
 
-创建 `.env.local` 文件：
+#### 方式 1: 完整监控 (推荐)
 
 ```bash
-# 数据库配置
-DATABASE_URL=postgresql://username:password@localhost:5432/lp_monitor
+# 1. 配置 Webhook (首次运行)
+node configure-stream.js
 
-# BSC RPC节点
-BSC_RPC_URL=https://summer-solemn-pond.bsc.quiknode.pro/2d7c7a259ea0c4de731c3fad666f309c6fff111e/
-
-# PancakeSwap V2 合约地址
-PANCAKE_FACTORY_ADDRESS=0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73
-PANCAKE_ROUTER_ADDRESS=0x10ED43C718714eb63d5aA57B78B54704E256024E
-
-# 监控配置
-LARGE_TRANSACTION_THRESHOLD_USD=10000
+# 2. 启动监控系统
+npm run monitor:streams
 ```
 
-### 3. 初始化数据库
-
-```bash
-# 创建数据库（如果还没创建）
-createdb lp_monitor
-
-# 执行数据库Schema
-psql -d lp_monitor -f src/db/schema.sql
-```
-
-### 4. 启动监控服务
-
-在一个终端窗口中启动区块链监听服务：
-
-```bash
-npm run monitor
-```
-
-### 5. 启动Web服务
-
-在另一个终端窗口中启动Next.js开发服务器：
+#### 方式 2: 仅 Web 界面
 
 ```bash
 npm run dev
 ```
 
-访问 http://localhost:3000 查看监控界面。
+访问: http://localhost:3000
 
-## 项目结构
+---
 
-```
-lp-monitor/
-├── src/
-│   ├── blockchain/          # 区块链交互
-│   │   ├── provider.js      # RPC Provider配置
-│   │   └── tokenService.js  # 代币信息服务
-│   ├── components/          # React组件
-│   │   ├── Layout.js        # 页面布局
-│   │   ├── PairCard.js      # 交易对卡片
-│   │   └── StatCard.js      # 统计卡片
-│   ├── contracts/           # 合约ABI
-│   │   └── abis.js          # Factory、Pair、ERC20 ABI
-│   ├── db/                  # 数据库
-│   │   ├── client.js        # PostgreSQL连接池
-│   │   ├── schema.sql       # 数据库Schema
-│   │   └── repositories/    # 数据访问层
-│   │       ├── tokenRepository.js
-│   │       ├── pairRepository.js
-│   │       ├── transactionRepository.js
-│   │       ├── liquidityRepository.js
-│   │       ├── alertRepository.js
-│   │       └── analyticsRepository.js
-│   ├── monitor/             # 监控服务
-│   │   ├── index.js         # 主启动脚本
-│   │   ├── analyzer.js      # 数据分析器
-│   │   └── listeners/       # 事件监听器
-│   │       ├── factoryListener.js
-│   │       └── pairListener.js
-│   ├── pages/               # Next.js页面
-│   │   ├── api/             # API路由
-│   │   ├── index.js         # 首页/仪表板
-│   │   ├── pairs/           # 交易对页面
-│   │   ├── transactions.js  # 交易页面
-│   │   └── alerts.js        # 警报页面
-│   ├── styles/              # 样式文件
-│   │   └── globals.css
-│   └── utils/               # 工具函数
-│       └── format.js        # 格式化函数
-├── package.json
-├── jsconfig.json
-└── README.md
+## 📚 文档导航
+
+### 🌟 必读文档
+
+| 文档 | 说明 | 优先级 |
+|------|------|--------|
+| [NEXT_STEPS.md](./NEXT_STEPS.md) | **下一步操作清单** | ⭐⭐⭐ |
+| [START_MONITORING.md](./START_MONITORING.md) | **完整启动指南** | ⭐⭐⭐ |
+| [CHANGES_SUMMARY.md](./CHANGES_SUMMARY.md) | **最新更新说明** | ⭐⭐⭐ |
+
+### 📖 参考文档
+
+| 文档 | 说明 |
+|------|------|
+| [SYSTEM_OVERVIEW.md](./SYSTEM_OVERVIEW.md) | 系统架构总览 |
+| [STREAMS_SETUP.md](./STREAMS_SETUP.md) | QuickNode Streams 配置 |
+| [WEBHOOK_DATA_FORMAT.md](./WEBHOOK_DATA_FORMAT.md) | Webhook 数据格式 |
+| [V3_SUPPORT.md](./V3_SUPPORT.md) | PancakeSwap V3 支持 |
+| [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) | 故障排查指南 |
+
+### 🛠️ 工具指南
+
+| 文档 | 说明 |
+|------|------|
+| [HOW_TO_GET_STREAM_ID.md](./HOW_TO_GET_STREAM_ID.md) | 如何获取 Stream ID |
+| [ENV_SETUP_GUIDE.md](./ENV_SETUP_GUIDE.md) | 环境变量配置 |
+
+---
+
+## 🛠️ 可用命令
+
+### 配置和诊断
+
+```bash
+node verify-stream-config.js    # 验证 Stream 配置
+node configure-stream.js         # 配置 Webhook 和启动 Stream
+./list-streams.sh                # 列出所有 Streams
 ```
 
-## API接口
+### 测试
 
-### 获取交易对列表
-```
-GET /api/pairs?limit=50&offset=0
-```
-
-### 获取交易对详情
-```
-GET /api/pairs/[address]
+```bash
+node test-webhook-data.js        # 测试 Webhook 数据处理
+node test-webhook.js             # 发送测试数据到 Webhook
 ```
 
-### 获取交易列表
-```
-GET /api/transactions?pairAddress=0x...&limit=50
-```
+### 运行
 
-### 获取流动性事件
-```
-GET /api/liquidity?pairAddress=0x...&limit=50
-```
-
-### 获取警报
-```
-GET /api/alerts?unreadOnly=false&limit=50
-PATCH /api/alerts (标记已读)
+```bash
+npm run dev                      # 启动前端开发服务器
+npm run monitor:streams          # 启动完整监控系统
+npm run build                    # 构建生产版本
+npm start                        # 启动生产服务器
 ```
 
-### 获取统计数据
+---
+
+## 📊 系统架构
+
 ```
-GET /api/stats
+┌─────────────────┐
+│  BSC Blockchain │
+│  (PancakeSwap)  │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│ QuickNode RPC   │  ← Factory 事件监听
+│   + Streams     │  ← 交易对事件推送
+└────────┬────────┘
+         │
+         ▼ Webhook
+┌─────────────────┐
+│  LP Monitor     │
+│  ├─ Listener    │  ← 处理新交易对
+│  ├─ Processor   │  ← 解析事件数据
+│  ├─ Analyzer    │  ← 数据分析
+│  └─ Alerter     │  ← 异常检测
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐     ┌─────────────────┐
+│   PostgreSQL    │ ←─→ │   Next.js Web   │
+│   (数据存储)     │     │   (可视化界面)   │
+└─────────────────┘     └─────────────────┘
 ```
 
-### 获取热门交易对
+---
+
+## 🔧 核心功能
+
+### 1. 交易对监控
+
+- 监听 PancakeSwap V2 Factory 的 `PairCreated` 事件
+- 自动添加新交易对到 QuickNode Stream
+- 支持 V2 和 V3 池子
+
+### 2. 事件处理
+
+**支持的事件**:
+- `Swap` - 交换事件
+- `Mint` - 添加流动性
+- `Burn` - 移除流动性
+- `Sync` - 储备同步
+
+**自动识别**:
+- PancakeSwap V2 和 V3
+- 根据事件签名自动选择解析逻辑
+
+### 3. 数据分析
+
+- **交易量计算**: 1小时滚动交易量
+- **大额交易**: 识别异常大额交易
+- **流动性追踪**: 监控流动性变化趋势
+- **Rug Pull 检测**: 识别可疑的流动性移除
+
+### 4. Web 界面
+
+- 📊 仪表盘 - 实时统计
+- 📋 交易对列表 - 所有监控的交易对
+- 🔍 交易对详情 - 单个交易对的完整信息
+- 🚨 告警中心 - 异常活动提醒
+
+---
+
+## 🎯 使用场景
+
+### 1. 新币发现
+
+实时监控新创建的交易对，抓住早期投资机会。
+
+### 2. 流动性监控
+
+追踪大额流动性变化，提前发现可能的抛售。
+
+### 3. 套利机会
+
+分析交易量和价格变化，发现套利机会。
+
+### 4. 风险规避
+
+检测 rug pull 信号，避免投资风险。
+
+---
+
+## ⚙️ 配置说明
+
+### 环境变量
+
+```bash
+# BSC RPC 节点
+BSC_RPC_URL=https://summer-solemn-pond.bsc.quiknode.pro/...
+
+# QuickNode Streams
+QUICKNODE_STREAM_ID=382f116e-dad2-4595-a51b-4b571f7e7c50
+QUICKNODE_API_KEY=QN_4c0e978dc96c4cc4b92a633ca77d6876
+
+# 数据库
+DATABASE_URL=postgresql://postgres:lp-monitor@127.0.0.1:5432/lp_monitor
+
+# Webhook
+WEBHOOK_PORT=3001
 ```
-GET /api/analytics/top-pairs?limit=10&hours=24
+
+### 合约地址
+
+```javascript
+// PancakeSwap V2 Factory
+0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73
+
+// 其他合约地址在代码中配置
 ```
 
-## 数据库表结构
+---
 
-- **tokens** - 代币信息
-- **pairs** - 交易对信息
-- **transactions** - 交易记录（Swap事件）
-- **liquidity_events** - 流动性事件（Mint/Burn）
-- **sync_events** - 价格同步事件
-- **analytics** - 小时级别统计数据
-- **alerts** - 警报信息
-- **monitor_state** - 监听器状态
+## 🔍 监控指标
 
-## 监控逻辑
+### 交易分析
 
-### 混合监听方案
+- ✅ 1小时交易量
+- ✅ 交易笔数
+- ✅ 大额交易识别
+- ✅ 价格影响分析
 
-1. **Factory监听器** - 实时监听新交易对创建
-2. **Pair监听器** - 为每个交易对创建独立的事件监听器
-3. **定时分析任务** - 每小时分析所有交易对，生成统计数据
-4. **数据更新任务** - 每10分钟更新分析数据
+### 流动性分析
 
-### 警报类型
+- ✅ 总流动性价值
+- ✅ 流动性变化趋势
+- ✅ 添加/移除事件
+- ✅ 异常流动性移除检测
 
-- `large_buy` - 大额买入交易
-- `large_sell` - 大额卖出交易  
-- `liquidity_surge` - 流动性激增
-- `liquidity_drain` - 流动性流失（Rug Pull风险）
-- `high_volume` - 交易量异常
-- `price_spike` - 价格异动
+### 异常检测
 
-## 使用说明
+- ✅ Rug Pull 风险
+- ✅ 闪电贷攻击
+- ✅ 价格操纵
+- ✅ 可疑交易模式
 
-### 启动顺序
+---
 
-1. 确保PostgreSQL服务运行
-2. 启动监控服务 `npm run monitor`
-3. 启动Web服务 `npm run dev`
+## 🐛 故障排查
 
-### 查看监控状态
+### 常见问题
 
-监控服务会在终端输出：
-- 新检测到的交易对
-- 实时交易事件
-- 流动性变化
-- 生成的警报
-- 系统状态（每30秒）
+1. **Stream 404 错误** ✅ 已修复
+2. **Webhook 收不到数据** → 查看 `TROUBLESHOOTING.md`
+3. **数据库连接失败** → 检查 PostgreSQL 服务
+4. **V3 事件不处理** ✅ 已支持
 
-### Web界面功能
+### 诊断工具
 
-- **仪表板** - 总览所有监控数据
-- **交易对列表** - 浏览所有已创建的交易对
-- **交易对详情** - 查看单个池子的详细数据和图表
-- **大额交易** - 查看最近的大额交易
-- **警报中心** - 查看和管理所有警报
+```bash
+# 验证配置
+node verify-stream-config.js
 
-## 注意事项
+# 测试 Webhook
+node test-webhook-data.js
 
-1. **RPC限制** - QuickNode有请求频率限制，避免过于频繁的查询
-2. **数据存储** - 长期运行会产生大量数据，建议定期清理历史数据
-3. **价格计算** - 当前版本未实现USD价格计算，需要接入价格Oracle
-4. **网络稳定性** - 确保网络连接稳定，避免丢失事件
+# 查看 Stream 列表
+./list-streams.sh
+```
 
-## 后续优化
+---
 
-- [ ] 接入价格Oracle计算USD价值
-- [ ] 添加WebSocket实时推送
-- [ ] 实现数据可视化图表（K线图、交易量图）
-- [ ] 支持更多DEX（PancakeSwap V3、Biswap等）
-- [ ] 添加Telegram/Discord机器人通知
-- [ ] 实现高级过滤和搜索功能
-- [ ] 添加数据导出功能
+## 📈 性能优化
 
-## 许可证
+### 已实现
 
-MIT
+- ✅ QuickNode Streams 避免 RPC 限制
+- ✅ 数据库索引优化
+- ✅ 批量数据处理
+- ✅ 事件去重
 
-## 贡献
+### 建议优化
 
-欢迎提交Issue和Pull Request！
+- 🔄 添加 Redis 缓存
+- 🔄 数据库分区
+- 🔄 WebSocket 实时推送
 
-## 联系方式
+---
 
-如有问题或建议，请通过Issue联系我们。
+## 🤝 贡献
 
+欢迎提交 Issue 和 Pull Request！
+
+---
+
+## 📜 许可证
+
+MIT License
+
+---
+
+## 🔗 相关链接
+
+- [QuickNode Documentation](https://www.quicknode.com/docs)
+- [PancakeSwap V2 Docs](https://docs.pancakeswap.finance/)
+- [PancakeSwap V3 Docs](https://docs.pancakeswap.finance/products/pancakeswap-exchange/v3)
+- [ethers.js Documentation](https://docs.ethers.org/)
+
+---
+
+## 📞 支持
+
+遇到问题？
+
+1. 📖 查看 [NEXT_STEPS.md](./NEXT_STEPS.md)
+2. 🔧 运行 `node verify-stream-config.js`
+3. 📚 阅读 [TROUBLESHOOTING.md](./TROUBLESHOOTING.md)
+
+---
+
+**最后更新**: 2024年11月24日
+
+**当前状态**: ✅ 已就绪，等待配置 Webhook
+
+**下一步**: 查看 [NEXT_STEPS.md](./NEXT_STEPS.md) 开始使用 🚀

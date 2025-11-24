@@ -5,12 +5,17 @@ const QUICKNODE_API_BASE = 'https://api.quicknode.com/streams/rest/v1/streams';
 const STREAM_ID = process.env.QUICKNODE_STREAM_ID;
 const API_KEY = process.env.QUICKNODE_API_KEY;
 
-// 事件签名
+// 事件签名 - 同时支持 V2 和 V3
 const EVENT_TOPICS = [
-  '0xc42079f94a6350d7e6235f29174924f928cc2ac818eb64fed8004e115fbcca67', // Swap
-  '0x4c209b5fc8ad50758f13e2e1088ba56a560dff690a1c6fef26394f4c03821c4f', // Mint
-  '0xdccd412f0b1252819cb1fd330b93224ca42612892bb3f4f789976e6d81936496', // Burn
+  // PancakeSwap V2
+  '0xd78ad95fa46c994b6551d0da85fc275fe613ce37657fb8d5e3d130840159d822', // Swap V2
+  '0x4c209b5fc8ad50758f13e2e1088ba56a560dff690a1c6fef26394f4c03821c4f', // Mint V2
+  '0xdccd412f0b1252819cb1fd330b93224ca42612892bb3f4f789976e6d81936496', // Burn V2
   '0x1c411e9a96e071241c2f21f7726b17ae89e3cab4c78be50e062b03a9fffbbad1', // Sync
+  // PancakeSwap V3
+  '0x19b47279256b2a23a1665c810c8d55a1758940ee09377d4f8d26497a3577dc83', // Swap V3
+  '0x7a53080ba414158be7ec69b987b5fb7d07dee101fe85488f0853ae16239d0bde', // Mint V3
+  '0x0c396cd989a39f4459b5fa1aed6a9a8dcdbc45908acfd67e028cd568da98982c', // Burn V3
 ];
 
 // 更新 Stream 监听的地址列表

@@ -5,12 +5,23 @@ const liquidityRepository = require('../../db/repositories/liquidityRepository')
 const pairRepository = require('../../db/repositories/pairRepository');
 const alertRepository = require('../../db/repositories/alertRepository');
 
-// 事件签名
+// 事件签名 - 支持 V2 和 V3
 const EVENT_SIGNATURES = {
-  SWAP: '0xc42079f94a6350d7e6235f29174924f928cc2ac818eb64fed8004e115fbcca67',
+  // PancakeSwap V2
+  SWAP_V2: '0xd78ad95fa46c994b6551d0da85fc275fe613ce37657fb8d5e3d130840159d822',
+  MINT_V2: '0x4c209b5fc8ad50758f13e2e1088ba56a560dff690a1c6fef26394f4c03821c4f',
+  BURN_V2: '0xdccd412f0b1252819cb1fd330b93224ca42612892bb3f4f789976e6d81936496',
+  SYNC: '0x1c411e9a96e071241c2f21f7726b17ae89e3cab4c78be50e062b03a9fffbbad1',
+  
+  // PancakeSwap V3
+  SWAP_V3: '0x19b47279256b2a23a1665c810c8d55a1758940ee09377d4f8d26497a3577dc83',
+  MINT_V3: '0x7a53080ba414158be7ec69b987b5fb7d07dee101fe85488f0853ae16239d0bde',
+  BURN_V3: '0x0c396cd989a39f4459b5fa1aed6a9a8dcdbc45908acfd67e028cd568da98982c',
+  
+  // 向后兼容 (默认使用 V2)
+  SWAP: '0xd78ad95fa46c994b6551d0da85fc275fe613ce37657fb8d5e3d130840159d822',
   MINT: '0x4c209b5fc8ad50758f13e2e1088ba56a560dff690a1c6fef26394f4c03821c4f',
   BURN: '0xdccd412f0b1252819cb1fd330b93224ca42612892bb3f4f789976e6d81936496',
-  SYNC: '0x1c411e9a96e071241c2f21f7726b17ae89e3cab4c78be50e062b03a9fffbbad1',
 };
 
 // 处理 Stream 推送的数据
@@ -47,12 +58,18 @@ async function processLog(log) {
     // 根据事件签名分发处理
     switch (eventSignature) {
       case EVENT_SIGNATURES.SWAP:
+      case EVENT_SIGNATURES.SWAP_V2:
+      case EVENT_SIGNATURES.SWAP_V3:
         await handleSwapEvent(log);
         break;
       case EVENT_SIGNATURES.MINT:
+      case EVENT_SIGNATURES.MINT_V2:
+      case EVENT_SIGNATURES.MINT_V3:
         await handleMintEvent(log);
         break;
       case EVENT_SIGNATURES.BURN:
+      case EVENT_SIGNATURES.BURN_V2:
+      case EVENT_SIGNATURES.BURN_V3:
         await handleBurnEvent(log);
         break;
       case EVENT_SIGNATURES.SYNC:
@@ -74,21 +91,44 @@ async function handleSwapEvent(log) {
   try {
     const { address, data, topics, blockNumber, transactionHash, blockTimestamp } = log;
     const pairAddress = address.toLowerCase();
+    const eventSignature = topics[0];
 
-    // 解析 Swap 事件数据
-    // event Swap(address indexed sender, uint amount0In, uint amount1In, uint amount0Out, uint amount1Out, address indexed to)
     const abiCoder = ethers.AbiCoder.defaultAbiCoder();
-    const decodedData = abiCoder.decode(
-      ['uint256', 'uint256', 'uint256', 'uint256'],
-      data
-    );
+    let sender, to, amount0In, amount1In, amount0Out, amount1Out;
 
-    const sender = '0x' + topics[1].slice(26);
-    const to = '0x' + topics[2].slice(26);
-    const amount0In = decodedData[0].toString();
-    const amount1In = decodedData[1].toString();
-    const amount0Out = decodedData[2].toString();
-    const amount1Out = decodedData[3].toString();
+    // 判断是 V2 还是 V3
+    if (eventSignature === EVENT_SIGNATURES.SWAP_V3) {
+      // V3: Swap(address indexed sender, address indexed recipient, int256 amount0, int256 amount1, uint160 sqrtPriceX96, uint128 liquidity, int24 tick)
+      const decodedData = abiCoder.decode(
+        ['int256', 'int256', 'uint160', 'uint128', 'int24'],
+        data
+      );
+
+      sender = '0x' + topics[1].slice(26);
+      to = '0x' + topics[2].slice(26);
+      
+      // V3 使用正负数表示方向
+      const amount0 = decodedData[0];
+      const amount1 = decodedData[1];
+      
+      amount0In = amount0 < 0n ? (-amount0).toString() : '0';
+      amount0Out = amount0 > 0n ? amount0.toString() : '0';
+      amount1In = amount1 < 0n ? (-amount1).toString() : '0';
+      amount1Out = amount1 > 0n ? amount1.toString() : '0';
+    } else {
+      // V2: Swap(address indexed sender, uint amount0In, uint amount1In, uint amount0Out, uint amount1Out, address indexed to)
+      const decodedData = abiCoder.decode(
+        ['uint256', 'uint256', 'uint256', 'uint256'],
+        data
+      );
+
+      sender = '0x' + topics[1].slice(26);
+      to = '0x' + topics[2].slice(26);
+      amount0In = decodedData[0].toString();
+      amount1In = decodedData[1].toString();
+      amount0Out = decodedData[2].toString();
+      amount1Out = decodedData[3].toString();
+    }
 
     // 转换时间戳
     const timestamp = blockTimestamp 
@@ -126,15 +166,24 @@ async function handleMintEvent(log) {
   try {
     const { address, data, topics, blockNumber, transactionHash, blockTimestamp } = log;
     const pairAddress = address.toLowerCase();
+    const eventSignature = topics[0];
 
-    // 解析 Mint 事件数据
-    // event Mint(address indexed sender, uint amount0, uint amount1)
     const abiCoder = ethers.AbiCoder.defaultAbiCoder();
-    const decodedData = abiCoder.decode(['uint256', 'uint256'], data);
+    let sender, amount0, amount1;
 
-    const sender = '0x' + topics[1].slice(26);
-    const amount0 = decodedData[0].toString();
-    const amount1 = decodedData[1].toString();
+    if (eventSignature === EVENT_SIGNATURES.MINT_V3) {
+      // V3: Mint(address sender, address indexed owner, int24 indexed tickLower, int24 indexed tickUpper, uint128 amount, uint256 amount0, uint256 amount1)
+      const decodedData = abiCoder.decode(['address', 'uint128', 'uint256', 'uint256'], data);
+      sender = decodedData[0].toLowerCase();
+      amount0 = decodedData[2].toString();
+      amount1 = decodedData[3].toString();
+    } else {
+      // V2: Mint(address indexed sender, uint amount0, uint amount1)
+      const decodedData = abiCoder.decode(['uint256', 'uint256'], data);
+      sender = '0x' + topics[1].slice(26);
+      amount0 = decodedData[0].toString();
+      amount1 = decodedData[1].toString();
+    }
 
     const timestamp = blockTimestamp
       ? new Date(parseInt(blockTimestamp, 16) * 1000)
@@ -168,16 +217,26 @@ async function handleBurnEvent(log) {
   try {
     const { address, data, topics, blockNumber, transactionHash, blockTimestamp } = log;
     const pairAddress = address.toLowerCase();
+    const eventSignature = topics[0];
 
-    // 解析 Burn 事件数据
-    // event Burn(address indexed sender, uint amount0, uint amount1, address indexed to)
     const abiCoder = ethers.AbiCoder.defaultAbiCoder();
-    const decodedData = abiCoder.decode(['uint256', 'uint256'], data);
+    let sender, to, amount0, amount1;
 
-    const sender = '0x' + topics[1].slice(26);
-    const to = '0x' + topics[2].slice(26);
-    const amount0 = decodedData[0].toString();
-    const amount1 = decodedData[1].toString();
+    if (eventSignature === EVENT_SIGNATURES.BURN_V3) {
+      // V3: Burn(address indexed owner, int24 indexed tickLower, int24 indexed tickUpper, uint128 amount, uint256 amount0, uint256 amount1)
+      const decodedData = abiCoder.decode(['uint128', 'uint256', 'uint256'], data);
+      sender = '0x' + topics[1].slice(26);
+      to = sender; // V3 没有单独的 to 地址
+      amount0 = decodedData[1].toString();
+      amount1 = decodedData[2].toString();
+    } else {
+      // V2: Burn(address indexed sender, uint amount0, uint amount1, address indexed to)
+      const decodedData = abiCoder.decode(['uint256', 'uint256'], data);
+      sender = '0x' + topics[1].slice(26);
+      to = '0x' + topics[2].slice(26);
+      amount0 = decodedData[0].toString();
+      amount1 = decodedData[1].toString();
+    }
 
     const timestamp = blockTimestamp
       ? new Date(parseInt(blockTimestamp, 16) * 1000)

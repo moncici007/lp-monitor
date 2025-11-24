@@ -14,15 +14,16 @@ async function createLiquidityEvent(eventData) {
     liquidity,
     amountUsd,
     timestamp,
+    logIndex = 0, // 添加 logIndex 参数，默认为 0
   } = eventData;
 
   const query = `
     INSERT INTO liquidity_events (
       pair_address, transaction_hash, block_number, event_type,
-      sender, recipient, amount0, amount1, liquidity, amount_usd, timestamp
+      sender, recipient, amount0, amount1, liquidity, amount_usd, timestamp, log_index
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-    ON CONFLICT (transaction_hash, event_type) DO NOTHING
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+    ON CONFLICT (transaction_hash, log_index) DO NOTHING
     RETURNING *
   `;
 
@@ -38,6 +39,7 @@ async function createLiquidityEvent(eventData) {
     liquidity,
     amountUsd,
     timestamp,
+    logIndex,
   ]);
 }
 

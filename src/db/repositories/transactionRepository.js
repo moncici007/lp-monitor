@@ -17,16 +17,17 @@ async function createTransaction(txData) {
     gasPrice,
     gasUsed,
     timestamp,
+    logIndex = 0, // 添加 logIndex 参数，默认为 0
   } = txData;
 
   const query = `
     INSERT INTO transactions (
       pair_address, transaction_hash, block_number, sender, recipient,
       amount0_in, amount1_in, amount0_out, amount1_out,
-      amount_usd, is_large, gas_price, gas_used, timestamp
+      amount_usd, is_large, gas_price, gas_used, timestamp, log_index
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-    ON CONFLICT (transaction_hash) DO NOTHING
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+    ON CONFLICT (transaction_hash, log_index) DO NOTHING
     RETURNING *
   `;
 
@@ -45,6 +46,7 @@ async function createTransaction(txData) {
     gasPrice,
     gasUsed,
     timestamp,
+    logIndex,
   ]);
 }
 

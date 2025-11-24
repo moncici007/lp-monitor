@@ -182,6 +182,7 @@ async function handleSwapEvent(log) {
       gasPrice: null,
       gasUsed: null,
       timestamp,
+      logIndex: parseInt(log.logIndex || log.index || '0', 16), // 添加 logIndex
     };
 
     await transactionRepository.createTransaction(txData);
@@ -266,6 +267,7 @@ async function handleMintEvent(log) {
       liquidity: null,
       amountUsd: null,
       timestamp,
+      logIndex: parseInt(log.logIndex || log.index || '0', 16), // 添加 logIndex
     };
 
     await liquidityRepository.createLiquidityEvent(eventData);
@@ -351,6 +353,7 @@ async function handleBurnEvent(log) {
       liquidity: null,
       amountUsd: null,
       timestamp,
+      logIndex: parseInt(log.logIndex || log.index || '0', 16), // 添加 logIndex
     };
 
     await liquidityRepository.createLiquidityEvent(eventData);

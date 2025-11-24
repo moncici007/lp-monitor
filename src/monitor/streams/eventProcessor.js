@@ -93,6 +93,12 @@ async function handleSwapEvent(log) {
     const pairAddress = address.toLowerCase();
     const eventSignature = topics[0];
 
+    // 验证必要字段
+    if (!blockNumber || !transactionHash || !topics || topics.length < 3) {
+      console.error('❌ Swap 事件数据不完整:', { blockNumber, transactionHash, topicsLength: topics?.length });
+      return;
+    }
+
     const abiCoder = ethers.AbiCoder.defaultAbiCoder();
     let sender, to, amount0In, amount1In, amount0Out, amount1Out;
 
@@ -130,15 +136,41 @@ async function handleSwapEvent(log) {
       amount1Out = decodedData[3].toString();
     }
 
+    // 安全地解析区块号和时间戳
+    const blockNum = typeof blockNumber === 'string' && blockNumber.startsWith('0x')
+      ? parseInt(blockNumber, 16)
+      : typeof blockNumber === 'number'
+        ? blockNumber
+        : parseInt(blockNumber);
+
+    if (isNaN(blockNum)) {
+      console.error('❌ 无效的区块号:', blockNumber);
+      return;
+    }
+
     // 转换时间戳
-    const timestamp = blockTimestamp 
-      ? new Date(parseInt(blockTimestamp, 16) * 1000)
-      : await getBlockTimestamp(parseInt(blockNumber, 16));
+    let timestamp;
+    if (blockTimestamp) {
+      const timestampNum = typeof blockTimestamp === 'string' && blockTimestamp.startsWith('0x')
+        ? parseInt(blockTimestamp, 16)
+        : typeof blockTimestamp === 'number'
+          ? blockTimestamp
+          : parseInt(blockTimestamp);
+      
+      if (!isNaN(timestampNum)) {
+        timestamp = new Date(timestampNum * 1000);
+      }
+    }
+    
+    // 如果没有有效的时间戳，从链上获取
+    if (!timestamp || isNaN(timestamp.getTime())) {
+      timestamp = await getBlockTimestamp(blockNum);
+    }
 
     const txData = {
       pairAddress,
       transactionHash,
-      blockNumber: parseInt(blockNumber, 16),
+      blockNumber: blockNum,
       sender: sender.toLowerCase(),
       recipient: to.toLowerCase(),
       amount0In,
@@ -157,6 +189,7 @@ async function handleSwapEvent(log) {
   } catch (error) {
     if (!error.message.includes('duplicate key')) {
       console.error('❌ 处理 Swap 事件失败:', error.message);
+      console.error('   事件数据:', { address: log.address, blockNumber: log.blockNumber, txHash: log.transactionHash });
     }
   }
 }
@@ -167,6 +200,12 @@ async function handleMintEvent(log) {
     const { address, data, topics, blockNumber, transactionHash, blockTimestamp } = log;
     const pairAddress = address.toLowerCase();
     const eventSignature = topics[0];
+
+    // 验证必要字段
+    if (!blockNumber || !transactionHash || !topics || topics.length < 2) {
+      console.error('❌ Mint 事件数据不完整');
+      return;
+    }
 
     const abiCoder = ethers.AbiCoder.defaultAbiCoder();
     let sender, amount0, amount1;
@@ -185,14 +224,40 @@ async function handleMintEvent(log) {
       amount1 = decodedData[1].toString();
     }
 
-    const timestamp = blockTimestamp
-      ? new Date(parseInt(blockTimestamp, 16) * 1000)
-      : await getBlockTimestamp(parseInt(blockNumber, 16));
+    // 安全地解析区块号
+    const blockNum = typeof blockNumber === 'string' && blockNumber.startsWith('0x')
+      ? parseInt(blockNumber, 16)
+      : typeof blockNumber === 'number'
+        ? blockNumber
+        : parseInt(blockNumber);
+
+    if (isNaN(blockNum)) {
+      console.error('❌ 无效的区块号:', blockNumber);
+      return;
+    }
+
+    // 转换时间戳
+    let timestamp;
+    if (blockTimestamp) {
+      const timestampNum = typeof blockTimestamp === 'string' && blockTimestamp.startsWith('0x')
+        ? parseInt(blockTimestamp, 16)
+        : typeof blockTimestamp === 'number'
+          ? blockTimestamp
+          : parseInt(blockTimestamp);
+      
+      if (!isNaN(timestampNum)) {
+        timestamp = new Date(timestampNum * 1000);
+      }
+    }
+    
+    if (!timestamp || isNaN(timestamp.getTime())) {
+      timestamp = await getBlockTimestamp(blockNum);
+    }
 
     const eventData = {
       pairAddress,
       transactionHash,
-      blockNumber: parseInt(blockNumber, 16),
+      blockNumber: blockNum,
       eventType: 'mint',
       sender: sender.toLowerCase(),
       recipient: sender.toLowerCase(),
@@ -219,6 +284,12 @@ async function handleBurnEvent(log) {
     const pairAddress = address.toLowerCase();
     const eventSignature = topics[0];
 
+    // 验证必要字段
+    if (!blockNumber || !transactionHash || !topics || topics.length < 2) {
+      console.error('❌ Burn 事件数据不完整');
+      return;
+    }
+
     const abiCoder = ethers.AbiCoder.defaultAbiCoder();
     let sender, to, amount0, amount1;
 
@@ -233,19 +304,45 @@ async function handleBurnEvent(log) {
       // V2: Burn(address indexed sender, uint amount0, uint amount1, address indexed to)
       const decodedData = abiCoder.decode(['uint256', 'uint256'], data);
       sender = '0x' + topics[1].slice(26);
-      to = '0x' + topics[2].slice(26);
+      to = topics.length > 2 ? '0x' + topics[2].slice(26) : sender;
       amount0 = decodedData[0].toString();
       amount1 = decodedData[1].toString();
     }
 
-    const timestamp = blockTimestamp
-      ? new Date(parseInt(blockTimestamp, 16) * 1000)
-      : await getBlockTimestamp(parseInt(blockNumber, 16));
+    // 安全地解析区块号
+    const blockNum = typeof blockNumber === 'string' && blockNumber.startsWith('0x')
+      ? parseInt(blockNumber, 16)
+      : typeof blockNumber === 'number'
+        ? blockNumber
+        : parseInt(blockNumber);
+
+    if (isNaN(blockNum)) {
+      console.error('❌ 无效的区块号:', blockNumber);
+      return;
+    }
+
+    // 转换时间戳
+    let timestamp;
+    if (blockTimestamp) {
+      const timestampNum = typeof blockTimestamp === 'string' && blockTimestamp.startsWith('0x')
+        ? parseInt(blockTimestamp, 16)
+        : typeof blockTimestamp === 'number'
+          ? blockTimestamp
+          : parseInt(blockTimestamp);
+      
+      if (!isNaN(timestampNum)) {
+        timestamp = new Date(timestampNum * 1000);
+      }
+    }
+    
+    if (!timestamp || isNaN(timestamp.getTime())) {
+      timestamp = await getBlockTimestamp(blockNum);
+    }
 
     const eventData = {
       pairAddress,
       transactionHash,
-      blockNumber: parseInt(blockNumber, 16),
+      blockNumber: blockNum,
       eventType: 'burn',
       sender: sender.toLowerCase(),
       recipient: to.toLowerCase(),

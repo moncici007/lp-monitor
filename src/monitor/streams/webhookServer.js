@@ -1,12 +1,21 @@
 const express = require('express');
-const bodyParser = require('body-parser');
 const { handleStreamData, handleFilteredEvents } = require('./eventProcessor');
 
 const app = express();
 
-// 使用 body-parser 解析 JSON
-app.use(bodyParser.json({ limit: '50mb' }));
-app.use(bodyParser.urlencoded({ extended: true, limit: '50mb' }));
+// 禁用 Express 的自动解析，手动处理
+app.use(express.json({ 
+  limit: '50mb',
+  verify: (req, res, buf, encoding) => {
+    // 保存原始 buffer 用于调试
+    req.rawBody = buf.toString(encoding || 'utf8');
+  }
+}));
+
+app.use(express.urlencoded({ 
+  extended: true, 
+  limit: '50mb' 
+}));
 
 // 健康检查端点
 app.get('/health', (req, res) => {
@@ -17,8 +26,42 @@ app.get('/health', (req, res) => {
 app.post('/streams/webhook', async (req, res) => {
   try {
     console.log('\n📨 收到 Streams Webhook 数据');
+    console.log('   Content-Type:', req.headers['content-type']);
+    console.log('   Content-Encoding:', req.headers['content-encoding']);
+    console.log('   Content-Length:', req.headers['content-length']);
+    console.log('   Accept-Encoding:', req.headers['accept-encoding']);
     
     const payload = req.body;
+    
+    // 从 headers 中提取区块信息（如果事件中缺少）
+    const blockNumber = req.headers['batch-start-range'] || req.headers['stream-start-range'];
+    const blockTimestamp = null; // Headers 中没有时间戳，需要从链上查询
+    
+    // 调试：检查 body 是否为空
+    if (!payload || (typeof payload === 'object' && Object.keys(payload).length === 0)) {
+      console.error('❌ req.body 为空或无效！');
+      console.error('   原始 body 长度:', req.rawBody ? req.rawBody.length : 0);
+      console.error('   原始 body 前100字符:', req.rawBody ? req.rawBody.substring(0, 100) : 'N/A');
+      
+      // 尝试手动解析
+      if (req.rawBody) {
+        try {
+          const parsed = JSON.parse(req.rawBody);
+          console.log('✅ 手动解析成功，使用手动解析的数据');
+          req.body = parsed;
+          // 继续处理，不返回错误
+        } catch (error) {
+          console.error('❌ 手动解析失败:', error.message);
+          return res.status(400).json({ error: 'Cannot parse request body' });
+        }
+      } else {
+        console.error('   可能的原因:');
+        console.error('   1. Content-Type 不正确');
+        console.error('   2. 请求体真的为空');
+        console.error('   3. 编码问题');
+        return res.status(400).json({ error: 'Empty request body' });
+      }
+    }
     
     // 调试：打印接收到的数据类型和键
     console.log('   Payload 类型:', typeof payload);
@@ -58,6 +101,18 @@ app.post('/streams/webhook', async (req, res) => {
       // 打印统计信息
       if (payload.stats) {
         console.log('   统计:', JSON.stringify(payload.stats, null, 2));
+      }
+      
+      // 检查事件是否缺少区块信息
+      const needsBlockInfo = payload.events.length > 0 && !payload.events[0].blockNumber;
+      
+      if (needsBlockInfo && blockNumber) {
+        console.log(`   ⚠️  事件缺少区块信息，从 Headers 补充: ${blockNumber}`);
+        // 为每个事件添加区块信息
+        payload.events.forEach(event => {
+          event.blockNumber = blockNumber;
+          event.blockTimestamp = blockTimestamp;
+        });
       }
       
       // 处理事件
